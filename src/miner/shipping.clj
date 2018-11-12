@@ -13,10 +13,6 @@
    {:id 5, :dow "R", :start "PDX", :end "DEN"}
    {:id 6, :dow "F", :start "DEN", :end "JFK"}])
 
-;; SEM: I didn't see any need to make legs into a set.  Each leg already has a unique ID so
-;; there's no chance of duplicates.
-
-
 ;; SEM:  The `shipping1` function takes advantage of integer codes for faster sorting.  We
 ;; change the "leg" maps to add a few extra attributes to be used instead of the strings.
 ;; That speeds things up considerably.
@@ -35,8 +31,11 @@
   (or (city-num city-str) (bit-set (hash city-str) 10)))
 
   
-;; SEM modified data to add integer keys for :day, :depart and :arrive which mirror the original
+;; SEM: modified data to add integer keys for :day, :depart and :arrive which mirror the original
 ;; string attributes :dow, :start and :end.
+
+;; SEM: I didn't see any need to make legs into a set.  Each leg already has a unique ID so
+;; there's no chance of duplicates.
 
 (def legs
   (->> (str/split (slurp "resources/legs.txt") #"\n")
@@ -45,6 +44,7 @@
                 {:id id :start start :end end :dow dow
                  :day (day-num dow) :depart (city-code start) :arrive (city-code end)})))
       ))
+
 
 (def tomorrow
   {"M" "T", "T" "W", "W" "R", "R" "F"})
@@ -196,7 +196,6 @@
            (reduce extend-paths1
                    [[] (mapv vector (sort-by :arrive (day-legs 0)))]
                    (map #(sort-by :depart %) (map day-legs (range 1 5)))))))
-
 
 
 
