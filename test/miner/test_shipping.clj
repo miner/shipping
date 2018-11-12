@@ -16,6 +16,10 @@
   (testing "shipping"
     (is (= (count (shipping legs)) 2414))))
 
+(deftest shipping1-test
+  (testing "shipping1"
+    (is (= (count (shipping1 legs)) 2414))))
+
 
 
 

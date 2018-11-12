@@ -16,11 +16,34 @@
 ;; SEM: I didn't see any need to make legs into a set.  Each leg already has a unique ID so
 ;; there's no chance of duplicates.
 
+
+;; SEM:  The `shipping1` function takes advantage of integer codes for faster sorting.  We
+;; change the "leg" maps to add a few extra attributes to be used instead of the strings.
+;; That speeds things up considerably.
+
+(def day-strs ["M" "T" "W" "R" "F"])
+(def day-num (zipmap day-strs (range)))
+
+(def city-num  (zipmap ["AUSTIN" "CHARLOTTE" "CHICAGO" "COLUMBUS" "DALLAS" "DETROIT"
+                        "EL_PASO" "FORT_WORTH" "HOUSTON" "INDIANAPOLIS" "JACKSONVILLE"
+                        "LOS_ANGELES" "NEW_YORK" "PHILADELPHIA" "PHOENIX" "SAN_ANTONIO"
+                        "SAN_DIEGO" "SAN_FRANCISCO" "SAN_JOSE" "SEATTLE"]
+                       (range 100 1000)))
+
+(defn city-code [city-str]
+  ;; the hash is just in case we get an unknown city
+  (or (city-num city-str) (bit-set (hash city-str) 10)))
+
+  
+;; SEM modified data to add integer keys for :day, :depart and :arrive which mirror the original
+;; string attributes :dow, :start and :end.
+
 (def legs
   (->> (str/split (slurp "resources/legs.txt") #"\n")
        (map (fn [s]
               (let [[id start end dow] (str/split s #"\s+")]
-                {:id id :start start :end end :dow dow})))
+                {:id id :start start :end end :dow dow
+                 :day (day-num dow) :depart (city-code start) :arrive (city-code end)})))
       ))
 
 (def tomorrow
@@ -133,6 +156,50 @@
            (reduce extend-paths
                    [[] (mapv vector (sort-by :end (day-legs "M")))]
                    (map #(sort-by :start %) (map day-legs ["T" "W" "R" "F"]))))))
+
+
+
+
+;; This can be faster if you convert string attributes to integer codes.  That helps the
+;; sorting run more quickly.  With a few small changes, I get about 40% faster execution.
+
+(defn by-arrival [path]
+  (:arrive (peek path)))
+
+(defn extend-paths1 [[old-paths today-paths] day-legs]
+  ;; today-paths are sorted by :arrive (and exclusively "today" :day)
+  ;; day-legs are just next day, sorted by :depart
+  ;; old-paths are ones that couldn't be extended
+  ;; new-paths are extended from today-paths with one of day-legs
+  ;;
+  ;; returns vector of [old-paths tomorrow-paths]
+  ;; with tomorrow-paths sorted by :arrive
+  (loop [legs day-legs paths today-paths tomorrow-paths [] olds old-paths]
+    (let [leg (first legs)
+          p (first paths)]
+      (if (nil? leg)
+        [(into olds paths) (sort-by by-arrival tomorrow-paths)]
+        (if (nil? p)
+          [olds (sort-by by-arrival (into tomorrow-paths (map vector legs)))]
+          (let [dep (:depart leg)
+                arr (:arrive (peek p))]
+            (if (= dep arr)
+              (recur (rest legs) (rest paths) (conj tomorrow-paths (conj p leg)) olds)
+              (if (> dep arr)
+                (recur legs (rest paths) tomorrow-paths (conj olds p))
+                (recur (rest legs) paths (conj tomorrow-paths (vector leg)) olds)))))))))
+
+;; Legs per day are sorted by :depart.  Existings paths sorted by last :arrive.
+(defn shipping1 [legs]
+  (let [day-legs (group-by :day legs)]
+    (apply concat
+           (reduce extend-paths1
+                   [[] (mapv vector (sort-by :arrive (day-legs 0)))]
+                   (map #(sort-by :depart %) (map day-legs (range 1 5)))))))
+
+
+
+
 
 
 
